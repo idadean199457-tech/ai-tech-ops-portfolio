@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 知识库客服助手</title>
+  <style>
+    :root { --ink:#152238; --muted:#637083; --line:#dce3ec; --blue:#1769e0; --soft:#f5f8fc; }
+    * { box-sizing:border-box; } body { margin:0; font-family:"Microsoft YaHei",sans-serif; color:var(--ink); background:var(--soft); }
+    main { max-width:1000px; margin:0 auto; padding:40px 24px 64px; }
+    header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:28px; }
+    h1 { margin:0; font-size:30px; } h1 span { color:var(--blue); } p { color:var(--muted); line-height:1.7; }
+    .badge { border:1px solid var(--line); background:#fff; padding:7px 10px; font-size:13px; color:var(--muted); }
+    .panel { background:#fff; border:1px solid var(--line); padding:24px; box-shadow:0 8px 22px rgba(23,48,82,.05); }
+    textarea { width:100%; min-height:122px; border:1px solid #bfcadb; padding:14px; font:16px/1.55 inherit; resize:vertical; }
+    button { border:0; background:var(--blue); color:#fff; padding:12px 18px; margin-top:14px; font:600 15px inherit; cursor:pointer; } button:disabled { opacity:.6; cursor:wait; }
+    #answer { margin-top:22px; display:none; } .answer { white-space:pre-wrap; background:#f1f6ff; border-left:4px solid var(--blue); padding:16px; line-height:1.7; }
+    .sources { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:16px; }
+    .source { border:1px solid var(--line); padding:14px; } .source b { color:var(--blue); font-size:13px; } .source h3 { font-size:15px; margin:6px 0; }
+    .feedback button { background:#fff; color:var(--ink); border:1px solid var(--line); margin-right:8px; padding:8px 12px; }
+    @media (max-width:600px) { main { padding:24px 16px; } header { display:block; } .badge { display:inline-block; margin-top:10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div><h1>AI 知识库<span>客服助手</span></h1><p>面向技术支持的检索问答、引用来源与问题反馈沉淀。</p></div><div class="badge" id="mode">本地检索模式</div></header>
+    <section class="panel"><label for="question">客户问题</label><textarea id="question" placeholder="例如：知识库回答没有引用来源，如何排查？"></textarea><button id="ask">开始诊断</button>
+      <div id="answer"><div class="answer" id="answerText"></div><div class="sources" id="sources"></div><div class="feedback"><p>这个建议是否解决了问题？</p><button data-helpful="true">有帮助</button><button data-helpful="false">需要补充</button></div></div>
+    </section>
+  </main>
+  <script>
+    const question = document.querySelector('#question'); const ask = document.querySelector('#ask'); let lastQuestion = '';
+    fetch('/api/health').then(r=>r.json()).then(data=>document.querySelector('#mode').textContent=data.mode==='llm'?'大模型增强模式':'本地检索模式');
+    ask.onclick = async () => { ask.disabled=true; ask.textContent='诊断中...'; lastQuestion=question.value; const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:lastQuestion})}); const data=await res.json(); ask.disabled=false; ask.textContent='开始诊断'; if(data.error){ alert(data.error); return; } document.querySelector('#answer').style.display='block'; document.querySelector('#answerText').textContent=data.answer; const sources=document.querySelector('#sources'); sources.replaceChildren(...data.sources.map(item=>{const div=document.createElement('div'); div.className='source'; div.innerHTML=`<b>${item.id}</b><h3>${item.title}</h3><p>${item.tags}</p>`; return div;})); };
+    document.querySelectorAll('[data-helpful]').forEach(button=>button.onclick=()=>fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:lastQuestion,helpful:button.dataset.helpful==='true'})}).then(()=>button.textContent='已记录'));
+  </script>
+</body>
+</html>
